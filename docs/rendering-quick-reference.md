@@ -36,8 +36,8 @@ line 3           [RED BG]    line 4 added [GREEN BG]
 
 **Code:**
 ```lua
-apply_line_highlights(left_bufnr, mapping.original, "VscodeDiffLineDelete")
-apply_line_highlights(right_bufnr, mapping.modified, "VscodeDiffLineInsert")
+apply_line_highlights(left_bufnr, mapping.original, "VSCodeDiffLineDelete")
+apply_line_highlights(right_bufnr, mapping.modified, "VSCodeDiffLineInsert")
 ```
 
 ---
@@ -55,7 +55,7 @@ Inner change: Range(2,1,3,1) -> Range(2,1,2,1)
 **Code:**
 ```lua
 if not is_empty_range(inner.original) then
-    apply_char_highlight(left_bufnr, inner.original, "VscodeDiffCharDelete", lines)
+    apply_char_highlight(left_bufnr, inner.original, "VSCodeDiffCharDelete", lines)
 end
 ```
 

@@ -34,29 +34,29 @@ function M.setup_highlights()
   local char_brightness = config.options.highlights.char_brightness
 
   -- Line-level highlights: Use base colors directly (DiffAdd, DiffDelete)
-  vim.api.nvim_set_hl(0, "VscodeDiffLineInsert", {
+  vim.api.nvim_set_hl(0, "VSCodeDiffLineInsert", {
     bg = line_insert_hl.bg or 0x1d3042,  -- Fallback to default green
     default = true,
   })
 
-  vim.api.nvim_set_hl(0, "VscodeDiffLineDelete", {
+  vim.api.nvim_set_hl(0, "VSCodeDiffLineDelete", {
     bg = line_delete_hl.bg or 0x351d2b,  -- Fallback to default red
     default = true,
   })
 
   -- Character-level highlights: Brighter versions of line highlights
-  vim.api.nvim_set_hl(0, "VscodeDiffCharInsert", {
+  vim.api.nvim_set_hl(0, "VSCodeDiffCharInsert", {
     bg = adjust_brightness(line_insert_hl.bg, char_brightness) or 0x2a4556,  -- Brighter green
     default = true,
   })
 
-  vim.api.nvim_set_hl(0, "VscodeDiffCharDelete", {
+  vim.api.nvim_set_hl(0, "VSCodeDiffCharDelete", {
     bg = adjust_brightness(line_delete_hl.bg, char_brightness) or 0x4b2a3d,  -- Brighter red
     default = true,
   })
 
   -- Filler lines (no highlight, inherits editor default background)
-  vim.api.nvim_set_hl(0, "VscodeDiffFiller", {
+  vim.api.nvim_set_hl(0, "VSCodeDiffFiller", {
     fg = "#444444",  -- Subtle gray for the slash character
     default = true,
     -- No bg set - uses editor's default background
@@ -104,7 +104,7 @@ local function insert_filler_lines(bufnr, after_line_0idx, count)
   local filler_text = string.rep("╱", 500)
 
   for _ = 1, count do
-    table.insert(virt_lines_content, {{filler_text, "VscodeDiffFiller"}})
+    table.insert(virt_lines_content, {{filler_text, "VSCodeDiffFiller"}})
   end
 
   vim.api.nvim_buf_set_extmark(bufnr, ns_filler, after_line_0idx, 0, {
@@ -419,11 +419,11 @@ function M.render_diff(left_bufnr, right_bufnr, original_lines, modified_lines, 
 
     -- STEP 1: Apply line-level highlights (light colors, whole lines)
     if not orig_is_empty then
-      apply_line_highlights(left_bufnr, mapping.original, "VscodeDiffLineDelete")
+      apply_line_highlights(left_bufnr, mapping.original, "VSCodeDiffLineDelete")
     end
 
     if not mod_is_empty then
-      apply_line_highlights(right_bufnr, mapping.modified, "VscodeDiffLineInsert")
+      apply_line_highlights(right_bufnr, mapping.modified, "VSCodeDiffLineInsert")
     end
 
     -- STEP 2: Apply character-level highlights (dark colors, specific text)
@@ -432,13 +432,13 @@ function M.render_diff(left_bufnr, right_bufnr, original_lines, modified_lines, 
         -- Apply to original side
         if not is_empty_range(inner.original) then
           apply_char_highlight(left_bufnr, inner.original,
-                             "VscodeDiffCharDelete", original_lines)
+                             "VSCodeDiffCharDelete", original_lines)
         end
 
         -- Apply to modified side
         if not is_empty_range(inner.modified) then
           apply_char_highlight(right_bufnr, inner.modified,
-                             "VscodeDiffCharInsert", modified_lines)
+                             "VSCodeDiffCharInsert", modified_lines)
         end
       end
     end

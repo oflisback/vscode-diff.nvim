@@ -9,7 +9,7 @@ The plugin provides built-in git integration to compare the current buffer with 
 When you have a file open that's tracked by git, you can compare it with any revision:
 
 ```vim
-:VscodeDiff HEAD
+:VSCodeDiff HEAD
 ```
 
 This will:
@@ -25,27 +25,27 @@ The command supports all standard git revision formats:
 
 ```vim
 " HEAD and relatives
-:VscodeDiff HEAD          " Last commit
-:VscodeDiff HEAD~1        " One commit before HEAD
-:VscodeDiff HEAD~5        " Five commits before HEAD
-:VscodeDiff HEAD^         " First parent of HEAD
+:VSCodeDiff HEAD          " Last commit
+:VSCodeDiff HEAD~1        " One commit before HEAD
+:VSCodeDiff HEAD~5        " Five commits before HEAD
+:VSCodeDiff HEAD^         " First parent of HEAD
 
 " Commit hashes
-:VscodeDiff abc123        " Short hash
-:VscodeDiff abc123def456  " Full hash
+:VSCodeDiff abc123        " Short hash
+:VSCodeDiff abc123def456  " Full hash
 
 " Branches
-:VscodeDiff main
-:VscodeDiff develop
-:VscodeDiff feature/my-branch
+:VSCodeDiff main
+:VSCodeDiff develop
+:VSCodeDiff feature/my-branch
 
 " Tags
-:VscodeDiff v1.0.0
-:VscodeDiff release-2024
+:VSCodeDiff v1.0.0
+:VSCodeDiff release-2024
 
 " Special refs
-:VscodeDiff origin/main
-:VscodeDiff @{upstream}
+:VSCodeDiff origin/main
+:VSCodeDiff @{upstream}
 ```
 
 ## Error Handling
@@ -55,7 +55,7 @@ The plugin provides clear error messages for common issues:
 ### Not in a Git Repository
 
 ```vim
-:VscodeDiff HEAD
+:VSCodeDiff HEAD
 " Error: Current file is not in a git repository
 ```
 
@@ -63,14 +63,14 @@ The plugin provides clear error messages for common issues:
 
 ```vim
 " In a scratch buffer or empty buffer
-:VscodeDiff HEAD
+:VSCodeDiff HEAD
 " Error: Current buffer is not a file
 ```
 
 ### File Not in Revision
 
 ```vim
-:VscodeDiff HEAD~10
+:VSCodeDiff HEAD~10
 " Error: File 'path/to/file.lua' not found in revision 'HEAD~10'
 ```
 
@@ -82,7 +82,7 @@ This can happen if:
 ### Invalid Revision
 
 ```vim
-:VscodeDiff nonexistent-branch
+:VSCodeDiff nonexistent-branch
 " Error: Invalid revision 'nonexistent-branch': ...
 ```
 
