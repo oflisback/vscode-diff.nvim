@@ -8,8 +8,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  version-and-tag:
+  build-and-test:
     if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true)
+    uses: ./.github/workflows/build-and-test.yml
+
+  version-and-tag:
+    needs: build-and-test
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -87,14 +91,8 @@ jobs:
           echo "created=true" >> $GITHUB_OUTPUT
           echo "Created and pushed tag: v$VERSION"
 
-  build-and-test:
-    needs: version-and-tag
-    if: needs.version-and-tag.outputs.tag_created == 'true'
-    uses: ./.github/workflows/build-and-test.yml
-
   release:
-    needs: [version-and-tag, build-and-test]
-    if: needs.version-and-tag.outputs.tag_created == 'true'
+    needs: [version-and-tag]
     runs-on: ubuntu-latest
     permissions:
       contents: write
