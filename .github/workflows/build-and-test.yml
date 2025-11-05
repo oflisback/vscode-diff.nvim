@@ -1,0 +1,85 @@
+name: Build and Test
+
+on:
+  workflow_call:
+
+jobs:
+  build-and-test:
+    name: Build and Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install build tools (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Install Neovim (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository ppa:neovim-ppa/unstable -y
+          sudo apt-get update
+          sudo apt-get install -y neovim
+          nvim --version | head -n 1
+
+      - name: Install Neovim (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install --HEAD neovim
+          nvim --version | head -n 1
+
+      - name: Install Neovim (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install neovim --pre -y
+          refreshenv
+          nvim --version | Select-Object -First 1
+
+      - name: Build library (Ubuntu/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          make clean
+          make
+
+      - name: Build library (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          .\build.cmd
+
+      - name: Run tests (Ubuntu/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          chmod +x tests/run_tests.sh
+          tests/run_tests.sh
+
+      - name: Run tests (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          tests/run_tests.sh
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: libvscode-diff-${{ matrix.os }}
+          path: |
+            libvscode_diff.so
+            libvscode_diff.dylib
+            libvscode_diff.dll
+          if-no-files-found: ignore
+          retention-days: 7
