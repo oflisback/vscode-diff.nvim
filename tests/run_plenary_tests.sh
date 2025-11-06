@@ -47,11 +47,11 @@ done
 # Summary
 echo "╔══════════════════════════════════════════════════════════════╗"
 if [ $FAILED -eq 0 ]; then
-  echo -e "║ ${GREEN}✓ ALL TESTS PASSED${NC}                                          ║"
+  echo -e "║ ${GREEN}✓ ALL TESTS PASSED${NC}                                           ║"
   echo "╚══════════════════════════════════════════════════════════════╝"
   exit 0
 else
-  echo -e "║ ${RED}✗ $FAILED TEST(S) FAILED${NC}                                       ║"
+  echo -e "║ ${RED}✗ $FAILED TEST(S) FAILED${NC}                                        ║"
   echo "╚══════════════════════════════════════════════════════════════╝"
   exit 1
 fi
