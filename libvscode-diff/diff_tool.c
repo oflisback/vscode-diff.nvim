@@ -24,6 +24,43 @@
 #include <stdbool.h>
 
 // ============================================================================
+// Portable High-Resolution Timing
+// ============================================================================
+
+#ifdef _WIN32
+#include <windows.h>
+
+typedef struct {
+    LARGE_INTEGER counter;
+} portable_time_t;
+
+static void portable_gettime(portable_time_t* t) {
+    QueryPerformanceCounter(&t->counter);
+}
+
+static double portable_time_diff_ms(portable_time_t* start, portable_time_t* end) {
+    static LARGE_INTEGER frequency = {0};
+    if (frequency.QuadPart == 0) {
+        QueryPerformanceFrequency(&frequency);
+    }
+    return (double)(end->counter.QuadPart - start->counter.QuadPart) / frequency.QuadPart * 1000.0;
+}
+
+#else
+// POSIX (Linux, macOS)
+typedef struct timespec portable_time_t;
+
+static void portable_gettime(portable_time_t* t) {
+    clock_gettime(CLOCK_MONOTONIC, t);
+}
+
+static double portable_time_diff_ms(portable_time_t* start, portable_time_t* end) {
+    return (end->tv_sec - start->tv_sec) * 1000.0 + 
+           (end->tv_nsec - start->tv_nsec) / 1000000.0;
+}
+#endif
+
+// ============================================================================
 // File Reading Utilities
 // ============================================================================
 
@@ -172,8 +209,8 @@ int main(int argc, char* argv[]) {
     };
 
     // Compute diff with timing
-    struct timespec start_time, end_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    portable_time_t start_time, end_time;
+    portable_gettime(&start_time);
     LinesDiff* diff = compute_diff(
         (const char**)original_lines,
         original_count,
@@ -181,9 +218,8 @@ int main(int argc, char* argv[]) {
         modified_count,
         &options
     );
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    double elapsed_ms = (end_time.tv_sec - start_time.tv_sec) * 1000.0 + 
-                        (end_time.tv_nsec - start_time.tv_nsec) / 1000000.0;
+    portable_gettime(&end_time);
+    double elapsed_ms = portable_time_diff_ms(&start_time, &end_time);
     
     if (!diff) {
         fprintf(stderr, "Error: Failed to compute diff\n");
