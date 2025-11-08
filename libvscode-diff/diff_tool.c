@@ -24,6 +24,43 @@
 #include <stdbool.h>
 
 // ============================================================================
+// Portable High-Resolution Timing
+// ============================================================================
+
+#ifdef _WIN32
+#include <windows.h>
+
+typedef struct {
+    LARGE_INTEGER counter;
+} portable_time_t;
+
+static void portable_gettime(portable_time_t* t) {
+    QueryPerformanceCounter(&t->counter);
+}
+
+static double portable_time_diff_ms(portable_time_t* start, portable_time_t* end) {
+    static LARGE_INTEGER frequency = {0};
+    if (frequency.QuadPart == 0) {
+        QueryPerformanceFrequency(&frequency);
+    }
+    return (double)(end->counter.QuadPart - start->counter.QuadPart) / frequency.QuadPart * 1000.0;
+}
+
+#else
+// POSIX (Linux, macOS)
+typedef struct timespec portable_time_t;
+
+static void portable_gettime(portable_time_t* t) {
+    clock_gettime(CLOCK_MONOTONIC, t);
+}
+
+static double portable_time_diff_ms(portable_time_t* start, portable_time_t* end) {
+    return (end->tv_sec - start->tv_sec) * 1000.0 + 
+           (end->tv_nsec - start->tv_nsec) / 1000000.0;
+}
+#endif
+
+// ============================================================================
 // File Reading Utilities
 // ============================================================================
 
@@ -37,7 +74,7 @@
  *   - Keeps '\r' if present (doesn't strip it like fgets does)
  */
 static int read_file_lines(const char* filename, char*** lines_out) {
-    FILE* file = fopen(filename, "r");
+    FILE* file = fopen(filename, "rb");
     if (!file) {
         fprintf(stderr, "Error: Cannot open file '%s'\n", filename);
         return -1;
@@ -164,15 +201,23 @@ int main(int argc, char* argv[]) {
     printf("=================================================================\n\n");
     
     // Set up diff options (matching Lua FFI defaults)
+    // Allow timeout override via environment variable for testing
+    const char* timeout_env = getenv("VSCODE_DIFF_TIMEOUT");
+    int timeout_ms = timeout_env ? atoi(timeout_env) : 5000;
+    
     DiffOptions options = {
         .ignore_trim_whitespace = false,
-        .max_computation_time_ms = 5000,  // 5 second timeout (same as Lua FFI)
+        .max_computation_time_ms = timeout_ms,
         .compute_moves = false,
         .extend_to_subwords = false
     };
 
     // Compute diff with timing
-    clock_t start_time = clock();
+    portable_time_t start_time, end_time;
+    clock_t cpu_start, cpu_end;
+    
+    portable_gettime(&start_time);
+    cpu_start = clock();
     LinesDiff* diff = compute_diff(
         (const char**)original_lines,
         original_count,
@@ -180,8 +225,11 @@ int main(int argc, char* argv[]) {
         modified_count,
         &options
     );
-    clock_t end_time = clock();
-    double elapsed_ms = ((double)(end_time - start_time)) / CLOCKS_PER_SEC * 1000.0;
+    cpu_end = clock();
+    portable_gettime(&end_time);
+    
+    double wall_clock_ms = portable_time_diff_ms(&start_time, &end_time);
+    double cpu_time_ms = ((double)(cpu_end - cpu_start)) / CLOCKS_PER_SEC * 1000.0;
     
     if (!diff) {
         fprintf(stderr, "Error: Failed to compute diff\n");
@@ -195,9 +243,6 @@ int main(int argc, char* argv[]) {
     printf("=================================================================\n");
     printf("Number of changes: %d\n", diff->changes.count);
     printf("Hit timeout: %s\n", diff->hit_timeout ? "yes" : "no");
-    if (show_timing) {
-        printf("Computation time: %.3f ms\n", elapsed_ms);
-    }
     printf("\n");
     
     if (diff->changes.count > 0) {
@@ -207,6 +252,15 @@ int main(int argc, char* argv[]) {
     }
     
     printf("\n=================================================================\n");
+    
+    if (show_timing) {
+        printf("Wall-clock time: %.3f ms (actual time elapsed)\n", wall_clock_ms);
+        printf("CPU time:        %.3f ms (sum of all threads)\n", cpu_time_ms);
+        if (cpu_time_ms > wall_clock_ms * 1.2) {
+            double parallelism = cpu_time_ms / wall_clock_ms;
+            printf("Parallelism:     %.2fx (using ~%.1f cores)\n", parallelism, parallelism);
+        }
+    }
     
     // Cleanup
     free_lines_diff(diff);
