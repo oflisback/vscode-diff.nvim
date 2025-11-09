@@ -24,7 +24,12 @@ if vim.fn.filereadable(lib_path) ~= 1 then
   if not success then
     error(string.format(
       "libvscode-diff not found and automatic installation failed: %s\n" ..
-      "Please build manually using 'make' or 'build.cmd', or download from releases.",
+      "Troubleshooting:\n" ..
+      "1. Check that curl or wget is installed\n" ..
+      "2. Verify internet connectivity to github.com\n" ..
+      "3. Try manual install: :CodeDiffInstall!\n" ..
+      "4. Or build from source: run 'make' (Unix) or 'build.cmd' (Windows)\n" ..
+      "5. Download manually from: https://github.com/esmuellert/vscode-diff.nvim/releases",
       err or "unknown error"
     ))
   end

@@ -82,6 +82,21 @@ cmake -B build -G "MinGW Makefiles" && cmake --build build
 - **Linux/macOS/BSD**: GCC/Clang and Make
 - **Windows**: Visual Studio (MSVC), MinGW-w64 (GCC), or CMake
 
+### Managing Library Installation
+
+The plugin includes commands to manage the C library installation:
+
+```vim
+" Install the library (if not already installed)
+:CodeDiffInstall
+
+" Force reinstall (useful after plugin updates)
+:CodeDiffInstall!
+```
+
+**Version Management:**
+The installer automatically reads the `VERSION` file in the plugin root to download the matching library version from GitHub releases. This ensures compatibility between the Lua code and C library.
+
 ## Usage
 
 The `:CodeDiff` command supports multiple modes:

@@ -4,6 +4,7 @@
 local M = {}
 
 -- Get the plugin root directory
+-- Navigates from lua/vscode-diff/installer.lua -> lua/vscode-diff/ -> lua/ -> plugin root
 local function get_plugin_root()
   local source = debug.getinfo(1).source:sub(2)
   return vim.fn.fnamemodify(source, ":h:h:h")
@@ -107,31 +108,50 @@ end
 
 -- Download file using curl, wget, or PowerShell
 local function download_file(url, dest_path)
-  local cmd
   local ffi = require("ffi")
+  local cmd_args
   
   -- Try curl first (most common, best error handling)
   if command_exists("curl") then
-    cmd = string.format("curl -fsSL -o '%s' '%s'", dest_path, url)
+    cmd_args = { "curl", "-fsSL", "-o", dest_path, url }
   elseif command_exists("wget") then
-    cmd = string.format("wget -q -O '%s' '%s'", dest_path, url)
+    cmd_args = { "wget", "-q", "-O", dest_path, url }
   elseif ffi.os == "Windows" then
     -- On Windows, try PowerShell Invoke-WebRequest
-    cmd = string.format(
-      'powershell -NoProfile -Command "Invoke-WebRequest -Uri \'%s\' -OutFile \'%s\'"',
-      url, dest_path
-    )
+    cmd_args = {
+      "powershell",
+      "-NoProfile",
+      "-Command",
+      string.format("Invoke-WebRequest -Uri '%s' -OutFile '%s'", url, dest_path)
+    }
   else
     return false, "No download tool found. Please install curl or wget."
   end
   
-  local exit_code = os.execute(cmd)
-  
-  -- os.execute returns true on success in Lua 5.2+, or 0 in Lua 5.1
-  if exit_code == true or exit_code == 0 then
-    return true
+  -- Use vim.system if available (Neovim 0.10+), fallback to os.execute
+  if vim.system then
+    local result = vim.system(cmd_args, { text = true }):wait()
+    if result.code == 0 then
+      return true
+    else
+      local err_msg = result.stderr or result.stdout or "Unknown error"
+      return false, string.format("Download failed: %s", err_msg)
+    end
   else
-    return false, string.format("Download failed with exit code: %s", tostring(exit_code))
+    -- Fallback for older Neovim versions
+    local cmd = table.concat(
+      vim.tbl_map(function(arg)
+        -- Basic escaping for shell
+        return string.format("'%s'", arg:gsub("'", "'\\''"))
+      end, cmd_args),
+      " "
+    )
+    local exit_code = os.execute(cmd)
+    if exit_code == true or exit_code == 0 then
+      return true
+    else
+      return false, string.format("Download failed with exit code: %s", tostring(exit_code))
+    end
   end
 end
 
