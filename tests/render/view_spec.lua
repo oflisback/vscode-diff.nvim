@@ -14,13 +14,20 @@ local function get_temp_path(filename)
   return temp_dir .. sep .. filename
 end
 
--- Helper to create session before calling view.create
--- Caller must create new tab first, then call this, then view.create
-local function create_test_session(left_path, right_path)
-  vim.cmd("tabnew")
+-- Helper to create diff view using new API
+local function create_test_diff_view(original_lines, modified_lines, left_path, right_path)
+  local session_config = {
+    mode = "standalone",  -- view.create will create new tab
+    git_root = nil,
+    original_path = left_path,
+    modified_path = right_path,
+    original_revision = "WORKING",
+    modified_revision = "WORKING",
+  }
+  
+  local result = view.create(original_lines, modified_lines, session_config)
   local tabpage = vim.api.nvim_get_current_tabpage()
-  lifecycle.create_session(tabpage, "standalone", nil, left_path, right_path, "WORKING", "WORKING")
-  return tabpage
+  return result, tabpage
 end
 
 describe("Render View", function()
@@ -50,8 +57,7 @@ describe("Render View", function()
     vim.fn.writefile(modified, right_path)
 
     -- New API: create session first
-    local tabpage = create_test_session(left_path, right_path)
-    local result = view.create(original, modified, lines_diff, tabpage, nil)
+    local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
 
     -- Should create a new tab
     local new_tabs = vim.fn.tabpagenr('$')
@@ -73,8 +79,7 @@ describe("Render View", function()
     vim.fn.writefile(original, left_path)
     vim.fn.writefile(modified, right_path)
 
-    local tabpage = create_test_session(left_path, right_path)
-    view.create(original, modified, lines_diff, tabpage, nil)
+    local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
 
     -- Wait for window setup
     vim.cmd('redraw')
@@ -99,8 +104,7 @@ describe("Render View", function()
     vim.fn.writefile(original, left_path)
     vim.fn.writefile(modified, right_path)
 
-    local tabpage = create_test_session(left_path, right_path)
-    local result = view.create(original, modified, lines_diff, tabpage, nil)
+    local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
 
     vim.cmd('redraw')
     vim.wait(100)
@@ -139,8 +143,7 @@ describe("Render View", function()
     vim.fn.writefile(original, left_path)
     vim.fn.writefile(modified, right_path)
 
-    local tabpage = create_test_session(left_path, right_path)
-    view.create(original, modified, lines_diff, tabpage, nil)
+    local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
 
     -- Wait for async operations to complete
     vim.cmd('redraw')
@@ -175,8 +178,7 @@ describe("Render View", function()
     vim.fn.writefile(modified, right_path)
 
     local success = pcall(function()
-      local tabpage = create_test_session(left_path, right_path)
-      view.create(original, modified, lines_diff, tabpage, nil)
+      local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
     end)
 
     assert.is_true(success, "Should handle empty files without error")
@@ -204,8 +206,7 @@ describe("Render View", function()
 
     local start_time = vim.loop.hrtime()
     
-    local tabpage = create_test_session(left_path, right_path)
-    view.create(original, modified, lines_diff, tabpage, nil)
+    local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
 
     local elapsed_ms = (vim.loop.hrtime() - start_time) / 1000000
 
@@ -222,7 +223,6 @@ describe("Render View", function()
   -- Test 7: Creates view with no changes
   it("Creates view when files have no changes", function()
     local lines = {"line 1", "line 2", "line 3"}
-    local lines_diff = diff.compute_diff(lines, lines)
 
     local left_path = get_temp_path("test_view_left_7.txt")
     local right_path = get_temp_path("test_view_right_7.txt")
@@ -230,8 +230,8 @@ describe("Render View", function()
     vim.fn.writefile(lines, right_path)
 
     local success = pcall(function()
-      local tabpage = create_test_session(left_path, right_path)
-      view.create(lines, lines, lines_diff, tabpage, nil)
+      local result, tabpage = create_test_diff_view(lines, lines, left_path, right_path)
+      return result ~= nil
     end)
 
     assert.is_true(success, "Should create view even with no changes")
@@ -251,8 +251,7 @@ describe("Render View", function()
     vim.fn.writefile(original, left_path)
     vim.fn.writefile(modified, right_path)
 
-    local tabpage = create_test_session(left_path, right_path)
-    view.create(original, modified, lines_diff, tabpage, nil)
+    local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
 
     local diff_tab = vim.api.nvim_get_current_tabpage()
 
@@ -280,8 +279,7 @@ describe("Render View", function()
     vim.fn.writefile(original1, left_path1)
     vim.fn.writefile(modified1, right_path1)
 
-    local tabpage1 = create_test_session(left_path1, right_path1)
-    view.create(original1, modified1, diff.compute_diff(original1, modified1), tabpage1, nil)
+    local result1, tabpage1 = create_test_diff_view(original1, modified1, left_path1, right_path1)
 
     -- Create second diff
     local original2 = {"c"}
@@ -291,8 +289,7 @@ describe("Render View", function()
     vim.fn.writefile(original2, left_path2)
     vim.fn.writefile(modified2, right_path2)
 
-    local tabpage2 = create_test_session(left_path2, right_path2)
-    view.create(original2, modified2, diff.compute_diff(original2, modified2), tabpage2, nil)
+    local result2, tabpage2 = create_test_diff_view(original2, modified2, left_path2, right_path2)
 
     local tabs_after = vim.fn.tabpagenr('$')
     assert.equal(tabs_before + 2, tabs_after, "Should create 2 new tabs")
@@ -315,8 +312,7 @@ describe("Render View", function()
     vim.fn.writefile(modified, right_path)
 
     local success = pcall(function()
-      local tabpage = create_test_session(left_path, right_path)
-      view.create(original, modified, lines_diff, tabpage, nil)
+      local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
     end)
 
     assert.is_true(success, "Should handle single-line files")
@@ -337,8 +333,7 @@ describe("Render View", function()
     vim.fn.writefile(modified, right_path)
 
     local success = pcall(function()
-      local tabpage = create_test_session(left_path, right_path)
-      view.create(original, modified, lines_diff, tabpage, nil)
+      local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
     end)
 
     assert.is_true(success, "Should handle special characters")
@@ -347,16 +342,7 @@ describe("Render View", function()
     vim.fn.delete(right_path)
   end)
 
-  -- Test 12: BufferType enum is defined
-  it("BufferType enum has correct values", function()
-    assert.is_not_nil(view.BufferType, "BufferType should be defined")
-    assert.is_not_nil(view.BufferType.REAL_FILE, "REAL_FILE should be defined")
-    assert.is_not_nil(view.BufferType.VIRTUAL_FILE, "VIRTUAL_FILE should be defined")
-    assert.equal("REAL_FILE", view.BufferType.REAL_FILE, "REAL_FILE value should be correct")
-    assert.equal("VIRTUAL_FILE", view.BufferType.VIRTUAL_FILE, "VIRTUAL_FILE value should be correct")
-  end)
-
-  -- Test 13: View creation doesn't affect other buffers
+  -- Test 12: View creation doesn't affect other buffers
   it("View creation doesn't modify other open buffers", function()
     -- Create a buffer with content
     local other_buf = vim.api.nvim_create_buf(false, false)
@@ -371,8 +357,7 @@ describe("Render View", function()
     vim.fn.writefile(original, left_path)
     vim.fn.writefile(modified, right_path)
 
-    local tabpage = create_test_session(left_path, right_path)
-    view.create(original, modified, lines_diff, tabpage, nil)
+    local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
 
     -- Other buffer should be unchanged
     local other_lines = vim.api.nvim_buf_get_lines(other_buf, 0, -1, false)
@@ -406,8 +391,7 @@ describe("Render View", function()
     vim.fn.writefile(modified, right_path)
 
     local success = pcall(function()
-      local tabpage = create_test_session(left_path, right_path)
-      view.create(original, modified, lines_diff, tabpage, nil)
+      local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
     end)
 
     assert.is_true(success, "Should handle many hunks")
@@ -429,8 +413,7 @@ describe("Render View", function()
       vim.fn.writefile(modified, right_path)
 
       local success = pcall(function()
-        local tabpage = create_test_session(left_path, right_path)
-        view.create(original, modified, lines_diff, tabpage, nil)
+        local result, tabpage = create_test_diff_view(original, modified, left_path, right_path)
       end)
 
       assert.is_true(success, "Iteration " .. i .. " should succeed")
