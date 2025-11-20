@@ -135,6 +135,37 @@ local function setup_auto_refresh(original_buf, modified_buf, original_is_virtua
   end
 end
 
+-- Setup ]f and [f keymaps for explorer file navigation
+local function setup_explorer_navigation_keymaps(tabpage, original_bufnr, modified_bufnr)
+  local function navigate_next()
+    local explorer_obj = lifecycle.get_explorer(tabpage)
+    if not explorer_obj then
+      vim.notify("No explorer found for this tab", vim.log.levels.WARN)
+      return
+    end
+    local explorer = require('vscode-diff.render.explorer')
+    explorer.navigate_next(explorer_obj)
+  end
+  
+  local function navigate_prev()
+    local explorer_obj = lifecycle.get_explorer(tabpage)
+    if not explorer_obj then
+      vim.notify("No explorer found for this tab", vim.log.levels.WARN)
+      return
+    end
+    local explorer = require('vscode-diff.render.explorer')
+    explorer.navigate_prev(explorer_obj)
+  end
+  
+  -- Set keymaps on both diff buffers with proper opts
+  local map_opts = { noremap = true, silent = true, nowait = true }
+  
+  vim.keymap.set('n', ']f', navigate_next, vim.tbl_extend('force', map_opts, { buffer = original_bufnr, desc = 'Next file in explorer' }))
+  vim.keymap.set('n', '[f', navigate_prev, vim.tbl_extend('force', map_opts, { buffer = original_bufnr, desc = 'Previous file in explorer' }))
+  vim.keymap.set('n', ']f', navigate_next, vim.tbl_extend('force', map_opts, { buffer = modified_bufnr, desc = 'Next file in explorer' }))
+  vim.keymap.set('n', '[f', navigate_prev, vim.tbl_extend('force', map_opts, { buffer = modified_bufnr, desc = 'Previous file in explorer' }))
+end
+
 ---@param session_config SessionConfig Session configuration
 ---@param filetype? string Optional filetype for syntax highlighting
 ---@return table|nil Result containing diff metadata, or nil if deferred
@@ -339,7 +370,12 @@ function M.create(session_config, filetype)
     local explorer = require('vscode-diff.render.explorer')
     local status_result = session_config.explorer_data.status_result
     
-    explorer.create(status_result, session_config.git_root, tabpage, explorer_width)
+    local explorer_obj = explorer.create(status_result, session_config.git_root, tabpage, explorer_width)
+    
+    -- Store explorer reference in lifecycle
+    lifecycle.set_explorer(tabpage, explorer_obj)
+    
+    -- Note: Keymaps will be set when first file is selected via update()
     
     -- After explorer is created, adjust diff window widths to be equal
     local remaining_width = total_width - explorer_width
@@ -506,6 +542,11 @@ function M.update(tabpage, session_config, auto_scroll_to_first_hunk)
 
       -- Re-enable auto-refresh for real file buffers
       setup_auto_refresh(original_info.bufnr, modified_info.bufnr, original_is_virtual, modified_is_virtual)
+      
+      -- Setup explorer navigation keymaps if in explorer mode
+      if session.mode == "explorer" then
+        setup_explorer_navigation_keymaps(tabpage, original_info.bufnr, modified_info.bufnr)
+      end
     end
   end
 

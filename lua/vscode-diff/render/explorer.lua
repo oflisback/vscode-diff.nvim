@@ -402,8 +402,15 @@ function M.create(status_result, git_root, tabpage, width)
     bufnr = split.bufnr,
     winid = split.winid,
     git_root = git_root,
-    on_file_select = on_file_select,
+    on_file_select = nil,  -- Will be set below
+    current_file_path = nil,  -- Track currently selected file
   }
+  
+  -- Wrap on_file_select to track current file
+  explorer.on_file_select = function(file_data)
+    explorer.current_file_path = file_data.path
+    on_file_select(file_data)
+  end
   
   -- Setup auto-refresh
   M.setup_auto_refresh(explorer, tabpage)
@@ -520,6 +527,118 @@ function M.refresh(explorer)
       end
     end)
   end)
+end
+
+-- Get flat list of all files from tree (unstaged + staged)
+local function get_all_files(tree)
+  local files = {}
+  local nodes = tree:get_nodes()
+  
+  for _, group_node in ipairs(nodes) do
+    if group_node:is_expanded() and group_node:has_children() then
+      for _, file_node in ipairs(group_node:get_child_ids()) do
+        local node = tree:get_node(file_node)
+        if node and node.data and not node.data.type then
+          table.insert(files, {
+            node = node,
+            data = node.data,
+          })
+        end
+      end
+    end
+  end
+  
+  return files
+end
+
+-- Navigate to next file in explorer
+function M.navigate_next(explorer)
+  local all_files = get_all_files(explorer.tree)
+  if #all_files == 0 then
+    vim.notify("No files in explorer", vim.log.levels.WARN)
+    return
+  end
+  
+  -- Use tracked current file path
+  local current_path = explorer.current_file_path
+  
+  -- If no current path, select first file
+  if not current_path then
+    local first_file = all_files[1]
+    explorer.on_file_select(first_file.data)
+    return
+  end
+  
+  -- Find current index
+  local current_index = 0
+  for i, file in ipairs(all_files) do
+    if file.data.path == current_path then
+      current_index = i
+      break
+    end
+  end
+  
+  -- Get next file (wrap around)
+  local next_index = current_index % #all_files + 1
+  local next_file = all_files[next_index]
+  
+  -- Update tree selection visually (switch to explorer window temporarily)
+  local current_win = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_is_valid(explorer.winid) then
+    vim.api.nvim_set_current_win(explorer.winid)
+    vim.api.nvim_win_set_cursor(explorer.winid, {next_file.node._line or 1, 0})
+    vim.api.nvim_set_current_win(current_win)
+  end
+  
+  -- Trigger file select
+  explorer.on_file_select(next_file.data)
+end
+
+-- Navigate to previous file in explorer
+function M.navigate_prev(explorer)
+  local all_files = get_all_files(explorer.tree)
+  if #all_files == 0 then
+    vim.notify("No files in explorer", vim.log.levels.WARN)
+    return
+  end
+  
+  -- Use tracked current file path
+  local current_path = explorer.current_file_path
+  
+  -- If no current path, select last file
+  if not current_path then
+    local last_file = all_files[#all_files]
+    explorer.on_file_select(last_file.data)
+    return
+  end
+  
+  -- Find current index
+  local current_index = 0
+  for i, file in ipairs(all_files) do
+    if file.data.path == current_path then
+      current_index = i
+      break
+    end
+  end
+  
+  -- Get previous file (wrap around)
+  local prev_index = current_index - 2
+  if prev_index < 0 then
+    prev_index = #all_files + prev_index
+  end
+  prev_index = prev_index % #all_files + 1
+  local prev_file = all_files[prev_index]
+  
+  -- Update tree selection visually (switch to explorer window temporarily)
+  local current_win = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_is_valid(explorer.winid) then
+    vim.api.nvim_set_current_win(explorer.winid)
+    vim.api.nvim_win_set_cursor(explorer.winid, {prev_file.node._line or 1, 0})
+    vim.api.nvim_set_current_win(current_win)
+  end
+  
+  -- Trigger file select
+  explorer.on_file_select(prev_file.data)
 end
 
 return M

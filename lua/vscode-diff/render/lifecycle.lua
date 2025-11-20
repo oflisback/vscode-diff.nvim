@@ -298,6 +298,9 @@ function M.create_session(tabpage, mode, git_root, original_path, modified_path,
       original = get_file_mtime(original_bufnr),
       modified = get_file_mtime(modified_bufnr),
     },
+    
+    -- Explorer reference (only for explorer mode)
+    explorer = nil,
   }
 
   -- Mark windows with restore flag
@@ -696,6 +699,21 @@ function M.update_revisions(tabpage, original_revision, modified_revision)
   session.original_revision = original_revision
   session.modified_revision = modified_revision
   return true
+end
+
+--- Set explorer reference (for explorer mode)
+function M.set_explorer(tabpage, explorer)
+  local session = active_diffs[tabpage]
+  if not session then return false end
+  
+  session.explorer = explorer
+  return true
+end
+
+--- Get explorer reference (for explorer mode)
+function M.get_explorer(tabpage)
+  local session = active_diffs[tabpage]
+  return session and session.explorer
 end
 
 --- Setup auto-sync on file switch: automatically update diff when user edits a different file in working buffer
