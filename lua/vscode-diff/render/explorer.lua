@@ -295,6 +295,24 @@ function M.create(status_result, git_root, tabpage, width, base_revision)
   -- Render tree
   tree:render()
 
+  -- Create explorer object early so we can reference it in keymaps
+  local explorer = {
+    split = split,
+    tree = tree,
+    bufnr = split.bufnr,
+    winid = split.winid,
+    git_root = git_root,
+    base_revision = base_revision,
+    on_file_select = nil,  -- Will be set below
+    current_file_path = nil,  -- Track currently selected file
+  }
+  
+  -- Wrap on_file_select to track current file
+  explorer.on_file_select = function(file_data)
+    explorer.current_file_path = file_data.path
+    on_file_select(file_data)
+  end
+
   -- Keymaps
   local map_options = { noremap = true, silent = true, nowait = true }
 
@@ -314,7 +332,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision)
     else
       -- File selected
       if node.data then
-        on_file_select(node.data)
+        explorer.on_file_select(node.data)
       end
     end
   end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
@@ -323,7 +341,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision)
   vim.keymap.set("n", "<2-LeftMouse>", function()
     local node = tree:get_node()
     if not node or not node.data or node.data.type == "group" then return end
-    on_file_select(node.data)
+    explorer.on_file_select(node.data)
   end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
 
   -- Close explorer (disabled)
@@ -392,11 +410,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision)
   
   -- Refresh explorer (R key)
   vim.keymap.set("n", "R", function()
-    local explorer_obj = {
-      tree = tree,
-      git_root = git_root,
-    }
-    M.refresh(explorer_obj)
+    M.refresh(explorer)
   end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
 
   -- Select first file by default
@@ -413,30 +427,13 @@ function M.create(status_result, git_root, tabpage, width, base_revision)
   if first_file then
     -- Defer to allow explorer to be fully set up
     vim.defer_fn(function()
-      on_file_select({
+      explorer.on_file_select({
         path = first_file.path,
         status = first_file.status,
         git_root = git_root,
         group = first_file_group,
       })
     end, 100)
-  end
-
-  local explorer = {
-    split = split,
-    tree = tree,
-    bufnr = split.bufnr,
-    winid = split.winid,
-    git_root = git_root,
-    base_revision = base_revision,
-    on_file_select = nil,  -- Will be set below
-    current_file_path = nil,  -- Track currently selected file
-  }
-  
-  -- Wrap on_file_select to track current file
-  explorer.on_file_select = function(file_data)
-    explorer.current_file_path = file_data.path
-    on_file_select(file_data)
   end
   
   -- Setup auto-refresh
