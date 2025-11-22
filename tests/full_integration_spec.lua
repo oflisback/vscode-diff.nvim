@@ -41,7 +41,14 @@ describe("Full Integration Suite", function()
       -- Use -C to run git in the temp directory
       -- On Windows, we need to ensure paths are handled correctly
       -- Use string.format for safer command construction
-      local cmd = string.format('git -C %s %s', vim.fn.shellescape(temp_dir), args)
+      -- IMPORTANT: On Windows, shellescape wraps in single quotes which cmd.exe doesn't like for paths
+      -- So we use double quotes for the path manually
+      local cmd
+      if vim.fn.has("win32") == 1 then
+        cmd = string.format('git -C "%s" %s', temp_dir, args)
+      else
+        cmd = string.format('git -C %s %s', vim.fn.shellescape(temp_dir), args)
+      end
       return vim.fn.system(cmd)
     end
     
@@ -130,7 +137,13 @@ describe("Full Integration Suite", function()
   it("Runs :CodeDiff main", function()
     -- Create a dev branch and switch to it so main is different
     -- Use shellescape for paths to handle spaces/special chars on Windows
-    local safe_temp_dir = vim.fn.shellescape(temp_dir)
+    local safe_temp_dir
+    if vim.fn.has("win32") == 1 then
+      safe_temp_dir = '"' .. temp_dir .. '"'
+    else
+      safe_temp_dir = vim.fn.shellescape(temp_dir)
+    end
+    
     vim.fn.system(string.format('git -C %s reset --hard HEAD~1', safe_temp_dir))
     vim.fn.system(string.format('git -C %s checkout -b feature', safe_temp_dir))
     vim.fn.writefile({"feature change"}, temp_dir .. "/file.txt")
@@ -150,7 +163,13 @@ describe("Full Integration Suite", function()
   -- 11. Arbitrary Revision Diff (Explorer)
   it("Runs :CodeDiff main HEAD", function()
     -- Ensure there is a diff between main and HEAD
-    local safe_temp_dir = vim.fn.shellescape(temp_dir)
+    local safe_temp_dir
+    if vim.fn.has("win32") == 1 then
+      safe_temp_dir = '"' .. temp_dir .. '"'
+    else
+      safe_temp_dir = vim.fn.shellescape(temp_dir)
+    end
+    
     vim.fn.system(string.format('git -C %s checkout HEAD~1', safe_temp_dir))
     -- Now HEAD is commit 1. main is commit 2.
     
