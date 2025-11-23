@@ -77,7 +77,7 @@ function M.setup()
   local char_delete_bg
   
   -- Auto-detect brightness based on background if not explicitly set
-  local brightness = opts.char_brightness or (vim.o.background == "light" and 0.9 or 1.4)
+  local brightness = opts.char_brightness or (vim.o.background == "light" and 0.92 or 1.4)
 
   if opts.char_insert then
     -- Explicit char_insert provided - use it directly
