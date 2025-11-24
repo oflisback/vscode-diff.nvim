@@ -8,6 +8,14 @@ A Neovim plugin that provides VSCode-style side-by-side diff rendering with two-
 
 </div>
 
+<div align="center">
+
+https://github.com/user-attachments/assets/64c41f01-dffe-4318-bce4-16eec8de356e
+
+**Demo: Quick walkthrough of diff features**
+
+</div>
+
 ## Features
 
 - **Two-tier highlighting system**:
