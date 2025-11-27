@@ -364,8 +364,6 @@ function M.install(opts)
       if not opts.silent then
         vim.notify("libvscode-diff (manual build) found at: " .. unversioned_path, vim.log.levels.INFO)
       end
-      -- Check libgomp even for manual builds
-      install_libgomp_if_needed(opts)
       return true
     end
 
@@ -376,8 +374,6 @@ function M.install(opts)
         if not opts.silent then
           vim.notify("libvscode-diff already installed at: " .. lib_path, vim.log.levels.INFO)
         end
-        -- Check libgomp even when library is up-to-date
-        install_libgomp_if_needed(opts)
         return true
       end
     elseif installed_version and not opts.silent then
