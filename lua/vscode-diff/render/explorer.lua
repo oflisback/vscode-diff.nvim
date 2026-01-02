@@ -479,7 +479,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
   }
 
   -- File selection callback - manages its own lifecycle
-  local function on_file_select(file_data)
+  local function on_file_select(file_data, is_repeat)
     local git = require('vscode-diff.git')
     local view = require('vscode-diff.render.view')
     local lifecycle = require('vscode-diff.render.lifecycle')
@@ -520,7 +520,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
           original_revision = base_revision,
           modified_revision = target_revision,
         }
-        view.update(tabpage, session_config, true)
+        view.update(tabpage, session_config, true, is_repeat)
       end)
       return
     end
@@ -547,7 +547,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
             original_revision = commit_hash,
             modified_revision = nil,
           }
-          view.update(tabpage, session_config, true)
+          view.update(tabpage, session_config, true, is_repeat)
         end)
       elseif group == "staged" then
         -- Staged changes: Compare staged (:0) vs HEAD (both virtual)
@@ -563,7 +563,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
             original_revision = commit_hash,
             modified_revision = ":0",
           }
-          view.update(tabpage, session_config, true)
+          view.update(tabpage, session_config, true, is_repeat)
         end)
       else
         -- Unstaged changes: Compare working tree vs staged (if exists) or HEAD
@@ -591,20 +591,20 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
             original_revision = original_revision,
             modified_revision = nil,
           }
-          view.update(tabpage, session_config, true)
+          view.update(tabpage, session_config, true, is_repeat)
         end)
       end
     end)
   end
   
   -- Wrap on_file_select to track current file and group
-  explorer.on_file_select = function(file_data)
+  explorer.on_file_select = function(file_data, is_repeat)
     explorer.current_file_path = file_data.path
     explorer.current_file_group = file_data.group
     selected_path = file_data.path
     selected_group = file_data.group
     tree:render()
-    on_file_select(file_data)
+    on_file_select(file_data, is_repeat)
   end
 
   -- Keymaps
@@ -615,7 +615,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
     vim.keymap.set("n", config.options.keymaps.explorer.select, function()
       local node = tree:get_node()
       if not node then return end
-  
+
       if node.data and (node.data.type == "group" or node.data.type == "directory") then
         -- Toggle group or directory
         if node:is_expanded() then
@@ -627,17 +627,31 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
       else
         -- File selected
         if node.data then
-          explorer.on_file_select(node.data)
+          -- Check if this is a repeat selection of the same file
+          local is_repeat = (explorer.current_file_path == node.data.path and
+                            explorer.current_file_group == node.data.group)
+
+          if is_repeat then
+            -- Second Enter on same file: just shift focus to diff panel
+            local lifecycle = require('vscode-diff.render.lifecycle')
+            local _, modified_win = lifecycle.get_windows(tabpage)
+            if modified_win and vim.api.nvim_win_is_valid(modified_win) then
+              vim.api.nvim_set_current_win(modified_win)
+            end
+          else
+            -- First Enter: show diff and stay in explorer
+            explorer.on_file_select(node.data, is_repeat)
+          end
         end
       end
     end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
   end
 
-  -- Double click also works for files
+  -- Double click also works for files (always focuses)
   vim.keymap.set("n", "<2-LeftMouse>", function()
     local node = tree:get_node()
     if not node or not node.data or node.data.type == "group" or node.data.type == "directory" then return end
-    explorer.on_file_select(node.data)
+    explorer.on_file_select(node.data, true)  -- Double-click always focuses
   end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
 
   -- Close explorer (disabled)

@@ -78,7 +78,7 @@ end
 
 -- Common logic: Compute diff and render highlights
 -- @param auto_scroll_to_first_hunk boolean: Whether to auto-scroll to first change (default true)
-local function compute_and_render(original_buf, modified_buf, original_lines, modified_lines, original_is_virtual, modified_is_virtual, original_win, modified_win, auto_scroll_to_first_hunk)
+local function compute_and_render(original_buf, modified_buf, original_lines, modified_lines, original_is_virtual, modified_is_virtual, original_win, modified_win, auto_scroll_to_first_hunk, should_focus_on_repeat)
   -- Compute diff
   local diff_options = {
     max_computation_time_ms = config.options.diff.max_computation_time_ms,
@@ -131,7 +131,8 @@ local function compute_and_render(original_buf, modified_buf, original_lines, mo
       pcall(vim.api.nvim_win_set_cursor, original_win, {target_line, 0})
       pcall(vim.api.nvim_win_set_cursor, modified_win, {target_line, 0})
 
-      if vim.api.nvim_win_is_valid(modified_win) then
+      -- Only shift focus if this is a repeat selection (double-enter)
+      if should_focus_on_repeat and vim.api.nvim_win_is_valid(modified_win) then
         vim.api.nvim_set_current_win(modified_win)
         vim.cmd("normal! zz")
       end
@@ -560,7 +561,8 @@ function M.create(session_config, filetype)
         original_lines, modified_lines,
         original_is_virtual, modified_is_virtual,
         original_win, modified_win,
-        true  -- auto_scroll_to_first_hunk = true on create
+        true,  -- auto_scroll_to_first_hunk = true on create
+        true   -- should_focus_on_repeat = true (always focus on initial create)
       )
 
       if lines_diff then
@@ -666,6 +668,11 @@ function M.create(session_config, filetype)
     -- Store explorer reference in lifecycle
     lifecycle.set_explorer(tabpage, explorer_obj)
 
+    -- Set initial focus to explorer window
+    if explorer_obj.winid and vim.api.nvim_win_is_valid(explorer_obj.winid) then
+      vim.api.nvim_set_current_win(explorer_obj.winid)
+    end
+
     -- Note: Keymaps will be set when first file is selected via update()
 
     -- Adjust diff window sizes based on explorer position
@@ -697,7 +704,7 @@ end
 ---@param session_config SessionConfig New session configuration (updates both sides)
 ---@param auto_scroll_to_first_hunk boolean? Whether to auto-scroll to first hunk (default: false)
 ---@return boolean success Whether update succeeded
-function M.update(tabpage, session_config, auto_scroll_to_first_hunk)
+function M.update(tabpage, session_config, auto_scroll_to_first_hunk, should_focus_on_repeat)
 
   -- Get existing session
   local session = lifecycle.get_session(tabpage)
@@ -758,16 +765,16 @@ function M.update(tabpage, session_config, auto_scroll_to_first_hunk)
     if not vim.api.nvim_win_is_valid(original_win) or not vim.api.nvim_win_is_valid(modified_win) then
       return
     end
-    
+
     -- Guard: Check if buffers are still valid
     if not vim.api.nvim_buf_is_valid(original_info.bufnr) or not vim.api.nvim_buf_is_valid(modified_info.bufnr) then
       return
     end
-    
+
     -- Always read from buffers (single source of truth)
     local original_lines = vim.api.nvim_buf_get_lines(original_info.bufnr, 0, -1, false)
     local modified_lines = vim.api.nvim_buf_get_lines(modified_info.bufnr, 0, -1, false)
-    
+
     -- Compute and render (scrollbind will be handled inside)
     -- Use the provided auto_scroll parameter, default to false if not specified
     local should_auto_scroll = auto_scroll_to_first_hunk == true
@@ -776,7 +783,8 @@ function M.update(tabpage, session_config, auto_scroll_to_first_hunk)
       original_lines, modified_lines,
       original_is_virtual, modified_is_virtual,
       original_win, modified_win,
-      should_auto_scroll
+      should_auto_scroll,
+      should_focus_on_repeat
     )
 
     if lines_diff then
@@ -793,6 +801,14 @@ function M.update(tabpage, session_config, auto_scroll_to_first_hunk)
 
       -- Re-enable auto-refresh for real file buffers
       setup_auto_refresh(original_info.bufnr, modified_info.bufnr, original_is_virtual, modified_is_virtual)
+
+      -- Restore focus to explorer if not a repeat selection
+      if not should_focus_on_repeat then
+        local explorer_obj = lifecycle.get_explorer(tabpage)
+        if explorer_obj and explorer_obj.winid and vim.api.nvim_win_is_valid(explorer_obj.winid) then
+          vim.api.nvim_set_current_win(explorer_obj.winid)
+        end
+      end
 
       -- Setup all keymaps in one place (centralized)
       local is_explorer_mode = session.mode == "explorer"
