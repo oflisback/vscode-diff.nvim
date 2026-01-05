@@ -1007,7 +1007,7 @@ function M.navigate_next(explorer)
   end
   
   -- Trigger file select
-  explorer.on_file_select(next_file.data)
+  explorer.on_file_select(next_file.data, true)
 end
 
 -- Navigate to previous file in explorer
@@ -1055,7 +1055,7 @@ function M.navigate_prev(explorer)
   end
   
   -- Trigger file select
-  explorer.on_file_select(prev_file.data)
+  explorer.on_file_select(prev_file.data, true)
 end
 
 -- Toggle explorer visibility (hide/show)
