@@ -479,11 +479,14 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
   }
 
   -- File selection callback - manages its own lifecycle
-  local function on_file_select(file_data, is_repeat)
+  local function on_file_select(file_data, opts)
+    opts = opts or {}
+    local focus_diff = opts.focus_diff or false
+
     local git = require('vscode-diff.git')
     local view = require('vscode-diff.render.view')
     local lifecycle = require('vscode-diff.render.lifecycle')
-    
+
     local file_path = file_data.path
     local old_path = file_data.old_path  -- For renames: path in original revision
     local abs_path = git_root .. "/" .. file_path
@@ -520,7 +523,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
           original_revision = base_revision,
           modified_revision = target_revision,
         }
-        view.update(tabpage, session_config, true, is_repeat)
+        view.update(tabpage, session_config, true, focus_diff)
       end)
       return
     end
@@ -547,7 +550,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
             original_revision = commit_hash,
             modified_revision = nil,
           }
-          view.update(tabpage, session_config, true, is_repeat)
+          view.update(tabpage, session_config, true, focus_diff)
         end)
       elseif group == "staged" then
         -- Staged changes: Compare staged (:0) vs HEAD (both virtual)
@@ -563,7 +566,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
             original_revision = commit_hash,
             modified_revision = ":0",
           }
-          view.update(tabpage, session_config, true, is_repeat)
+          view.update(tabpage, session_config, true, focus_diff)
         end)
       else
         -- Unstaged changes: Compare working tree vs staged (if exists) or HEAD
@@ -591,20 +594,20 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
             original_revision = original_revision,
             modified_revision = nil,
           }
-          view.update(tabpage, session_config, true, is_repeat)
+          view.update(tabpage, session_config, true, focus_diff)
         end)
       end
     end)
   end
   
   -- Wrap on_file_select to track current file and group
-  explorer.on_file_select = function(file_data, is_repeat)
+  explorer.on_file_select = function(file_data, opts)
     explorer.current_file_path = file_data.path
     explorer.current_file_group = file_data.group
     selected_path = file_data.path
     selected_group = file_data.group
     tree:render()
-    on_file_select(file_data, is_repeat)
+    on_file_select(file_data, opts)
   end
 
   -- Keymaps
@@ -640,7 +643,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
             end
           else
             -- First Enter: show diff and stay in explorer
-            explorer.on_file_select(node.data, is_repeat)
+            explorer.on_file_select(node.data, {focus_diff = false})
           end
         end
       end
@@ -651,7 +654,7 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
   vim.keymap.set("n", "<2-LeftMouse>", function()
     local node = tree:get_node()
     if not node or not node.data or node.data.type == "group" or node.data.type == "directory" then return end
-    explorer.on_file_select(node.data, true)  -- Double-click always focuses
+    explorer.on_file_select(node.data, {focus_diff = true})  -- Double-click always focuses
   end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
 
   -- Close explorer (disabled)
@@ -1007,7 +1010,7 @@ function M.navigate_next(explorer)
   end
   
   -- Trigger file select
-  explorer.on_file_select(next_file.data, true)
+  explorer.on_file_select(next_file.data, {focus_diff = true})
 end
 
 -- Navigate to previous file in explorer
@@ -1055,7 +1058,7 @@ function M.navigate_prev(explorer)
   end
   
   -- Trigger file select
-  explorer.on_file_select(prev_file.data, true)
+  explorer.on_file_select(prev_file.data, {focus_diff = true})
 end
 
 -- Toggle explorer visibility (hide/show)

@@ -78,7 +78,8 @@ end
 
 -- Common logic: Compute diff and render highlights
 -- @param auto_scroll_to_first_hunk boolean: Whether to auto-scroll to first change (default true)
-local function compute_and_render(original_buf, modified_buf, original_lines, modified_lines, original_is_virtual, modified_is_virtual, original_win, modified_win, auto_scroll_to_first_hunk, should_focus_on_repeat)
+-- @param focus_diff boolean: Whether to focus the diff window after rendering (default false)
+local function compute_and_render(original_buf, modified_buf, original_lines, modified_lines, original_is_virtual, modified_is_virtual, original_win, modified_win, auto_scroll_to_first_hunk, focus_diff)
   -- Compute diff
   local diff_options = {
     max_computation_time_ms = config.options.diff.max_computation_time_ms,
@@ -131,8 +132,8 @@ local function compute_and_render(original_buf, modified_buf, original_lines, mo
       pcall(vim.api.nvim_win_set_cursor, original_win, {target_line, 0})
       pcall(vim.api.nvim_win_set_cursor, modified_win, {target_line, 0})
 
-      -- Only shift focus if this is a repeat selection (double-enter)
-      if should_focus_on_repeat and vim.api.nvim_win_is_valid(modified_win) then
+      -- Only shift focus if requested (e.g., navigating files with next/prev)
+      if focus_diff and vim.api.nvim_win_is_valid(modified_win) then
         vim.api.nvim_set_current_win(modified_win)
         vim.cmd("normal! zz")
       end
@@ -562,7 +563,7 @@ function M.create(session_config, filetype)
         original_is_virtual, modified_is_virtual,
         original_win, modified_win,
         true,  -- auto_scroll_to_first_hunk = true on create
-        true   -- should_focus_on_repeat = true (always focus on initial create)
+        true   -- focus_diff = true (always focus on initial create)
       )
 
       if lines_diff then
@@ -703,8 +704,9 @@ end
 ---@param tabpage number Tabpage ID of the diff session
 ---@param session_config SessionConfig New session configuration (updates both sides)
 ---@param auto_scroll_to_first_hunk boolean? Whether to auto-scroll to first hunk (default: false)
+---@param focus_diff boolean? Whether to focus the diff window after update (default: false)
 ---@return boolean success Whether update succeeded
-function M.update(tabpage, session_config, auto_scroll_to_first_hunk, should_focus_on_repeat)
+function M.update(tabpage, session_config, auto_scroll_to_first_hunk, focus_diff)
 
   -- Get existing session
   local session = lifecycle.get_session(tabpage)
@@ -784,7 +786,7 @@ function M.update(tabpage, session_config, auto_scroll_to_first_hunk, should_foc
       original_is_virtual, modified_is_virtual,
       original_win, modified_win,
       should_auto_scroll,
-      should_focus_on_repeat
+      focus_diff or false
     )
 
     if lines_diff then
@@ -802,8 +804,8 @@ function M.update(tabpage, session_config, auto_scroll_to_first_hunk, should_foc
       -- Re-enable auto-refresh for real file buffers
       setup_auto_refresh(original_info.bufnr, modified_info.bufnr, original_is_virtual, modified_is_virtual)
 
-      -- Restore focus to explorer if not a repeat selection
-      if not should_focus_on_repeat then
+      -- Restore focus to explorer unless explicitly requesting diff focus
+      if not focus_diff then
         local explorer_obj = lifecycle.get_explorer(tabpage)
         if explorer_obj and explorer_obj.winid and vim.api.nvim_win_is_valid(explorer_obj.winid) then
           vim.api.nvim_set_current_win(explorer_obj.winid)
